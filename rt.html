@@ -1,20 +1,35 @@
 <!DOCTYPE html>
 <html>
-<head><title>Javascript RT</title></head>
+<head><title>RayTracing Example Javascript</title></head>
 
-<body>
-<canvas id="framebuffer" width="800" height="600"></canvas>
+<body style="background-color: #333; color: white">
+<canvas id="framebuffer" width="400" height="400"></canvas><br>
+<button id="runButton" onclick="startstopClicked()">Start</button>
+<div class="slidecontainer">
+    Field of View: <input type="range" min="0" max="10" value="2" step="0.1" class="slider" onchange="updateFov(this.value)"><span id="fov">2</span><br>
+    Image Width: <input type="range" min="25" max="1000" value="400" step="5" class="slider" onchange="updateWidth(this.value)"><span id="width">400</span><br>
+    Image Height: <input type="range" min="25" max="1000" value="400" step="5" class="slider" onchange="updateHeight(this.value)"><span id="height">400</span><br>
+    Reflection Depth: <input type="range" min="0" max="10" value="1" step="1" class="slider" onchange="updateDepth(this.value)"><span id="reflectionDepth">1</span><br>
+    <br><!-- Sliders for Objects: -->
+    Sphere1 Size: <input type="range" min="0" max="5" value="0.5" step="0.1" class="slider" onchange="updateSphere1Size(this.value)"><span id="s1size">0.5</span><br>
+    Sphere2 Size: <input type="range" min="0" max="5" value="0.5" step="0.1" class="slider" onchange="updateSphere2Size(this.value)"><span id="s2size">0.5</span><br>
+    Sphere2 Height: <input type="range" min="-5" max="5" value="0" step="0.1" class="slider" onchange="updateSphere2Height(this.value)"><span id="s2height">0</span><br>
+</div>
 <script type="text/javascript">
 /* Javascript minimal ray tracing engine
  * Copyright (C) 2012 Salvatore Sanfilippo <antirez@gmail.com>
+ * https://github.com/antirez/jsrt
  *
  * This softare is released under the terms of the BSD two-clause license. */
 
 var ctx;
 var pixels;
-var screen_width = 320;
-var screen_height = 200;
+var screen_width = 400;
+var screen_height = 400;
+var fov = 2;
+var reflectionDepth = 1;
 var frame = 0;
+var running = false;
 
 function init() {
     ctx = document.getElementById('framebuffer').getContext('2d');
@@ -23,7 +38,13 @@ function init() {
 };
 
 function draw() {
-    if (frame > 160) return;
+    if(!running){
+        return;
+    }
+
+    if(frame > 1){
+        return;
+    }
 
     var start = new Date().getTime();
     computeScene();
@@ -35,57 +56,50 @@ function draw() {
 function computeScene() {
     var scene = new Scene();
 
+    /*** SPHERES ***/
     var sphere1 = scene.addObject(new Obj("Sphere 1",new Sphere()));
-    var sphere2 = scene.addObject(new Obj("Sphere 2",new Sphere()));
-    var plane = scene.addObject(new Obj("Ground",new Plane(0,.5,-2,0,.5,-4,2,.5,-2)));
-    var light1 = scene.addLight(new Obj("Light 1",new Light()));
-    var light2 = scene.addLight(new Obj("Light 2",new Light()));
-    var light3 = scene.addLight(new Obj("Light 3",new Light()));
+    sphere1.o.center = new Vector(2*Math.cos(frame/10), -1+Math.sin(2*frame/10), 2*Math.sin(frame/10));
+    sphere1.o.radius = sphere1Size;
 
-    sphere1.o.center.x = Math.cos(frame/10);
-    sphere1.o.center.z = Math.sin(frame/10);
-    sphere1.o.radius = 0.5;
-   
-    sphere2.o.center.x = 0;
-    sphere2.o.radius = 0.5;
-
-    light1.o.center.set(4,-1,-2);
-    light2.o.center.set(-1,-1,-2);
-    light3.o.center.set(1,-6,-2);
-
-    light1.color.r = .5;
-    light1.color.g = .5;
-    light1.color.b = .5;
-
-    light2.color.r = .3;
-    light2.color.g = .3;
-    light2.color.b = .3;
-
-    light3.color.r = .4;
-    light3.color.g = .4;
-    light3.color.b = .4;
-
-    sphere1.color.r = 1;
-    sphere1.color.g = .3;
-    sphere1.color.b = .3;
+    sphere1.color = new Color(1, .3, .3);
     sphere1.specularity = .5;
     sphere1.reflection = .1;
+    //sphere1.reflection = 0;
 
-    sphere2.color.r = .3;
-    sphere2.color.g = 1;
-    sphere2.color.b = .3;
+    var sphere2 = scene.addObject(new Obj("Sphere 2",new Sphere()));
+    sphere2.o.center = new Vector(0, sphere2Height, 0);
+    sphere2.o.radius = sphere2Size;
+
+    sphere2.color = new Color(.3, 1, .3);
     sphere2.specularity = .5;
     sphere2.reflection = .1;
+    //sphere2.reflection = 0;
 
-    plane.color.r = .3;
-    plane.color.g = .3;
-    plane.color.b = .3;
+    /*** PLANES ***/
+    var plane = scene.addObject(new Obj("Ground",new Plane(0,.5,-2,0,.5,-4,2,.5,-2)));
+    plane.color = new Color(.2);
+    plane.reflection = 1;
+
+    // var plane2 = scene.addObject(new Obj("Plane2",new Plane(0,-2,-2,0,-2,-4,2,-2,-2)));
+    // plane2.color = new Color(.1);
+
+    /*** LIGHTS ***/
+    var light1 = scene.addLight(new Obj("Light 1",new Light()));
+    light1.o.center = new Vector(4,-1,-2);
+    light1.color = new Color(.5);
+
+    var light2 = scene.addLight(new Obj("Light 2",new Light()));
+    light2.o.center = new Vector(-1,-1,-2);
+    light2.color = new Color(.3);
+    
+    var light3 = scene.addLight(new Obj("Light 3",new Light()));
+    light3.o.center = new Vector(1,-6,-2);
+    light3.color = new Color(.4);
 
     scene.traceScene();
 }
 
-// Vector implementation
-
+/* Vector Implementierung */
 function Vector(x,y,z) {
     if (arguments.length == 0) {
         x = y = z = 0;
@@ -101,15 +115,49 @@ Vector.prototype = {
         this.x = x;
         this.y = y;
         this.z = z;
+        return this;
     },
 
-    // Vector magnitude
+    add: function(v){
+        this.x += v.x;
+        this.y += v.y;
+        this.z += v.z;
+        return this;
+    },
+
+    subtract: function(v){
+        this.x -= v.x;
+        this.y -= v.y;
+        this.z -= v.z;
+        return this;
+    },
+
+    multiply: function(factor){
+        this.x *= factor;
+        this.y *= factor;
+        this.z *= factor;
+        return this;
+    },
+
+    add_c: function(v){
+        return this.copy().add(v);
+    },
+
+    subtract_c: function(v){
+        return this.copy().subtract(v);
+    },
+
+    multiply_c: function(f){
+        return this.copy().multiply(f);
+    },
+
+    // Vector Länge
     magnitude: function() {
         return Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z);
     },
 
-    // Vector normalization (modify the vector so that that it has
-    // magnitude 1 but with the same orientation as the original vector).
+    /* Normalisierung eines Vektors, sodass die Länge 1 ist,
+    aber die Richtung erhalten bleibt.*/
     normalize: function() {
         var m = this.magnitude();
 
@@ -118,18 +166,36 @@ Vector.prototype = {
         this.y /= m;
         this.z /= m;
         return this;
+    },
+
+    normalize_c: function(){
+        return this.copy().normalize();
+    },
+
+    dotProduct: function(v) {
+        return (v.x*this.x + v.y*this.y + v.z*this.z);
+    },
+
+    copy: function(){
+        return new Vector(this.x, this.y, this.z);
     }
 }
 
-// Ray implementation
-
+/* Ray Implementierung*/
 function Ray() {
     this.origin = new Vector();
     this.direction = new Vector();
+
+    this.getPoint = function (d){
+        return new Vector(
+            this.origin.x + this.direction.x * d,
+            this.origin.y + this.direction.y * d,
+            this.origin.z + this.direction.z * d,
+            );
+    }
 }
 
-// Sphere implementation
-
+/* Kugel Implementierung*/
 function Sphere() {
     this.type = "sphere";
     this.center = new Vector();
@@ -137,37 +203,37 @@ function Sphere() {
 }
 
 Sphere.prototype = {
-    /* Normal on a point of the sphere, normalized.
-       We don't use the Vector object for speed issues. */
-    normalToPoint: function(x,y,z) {
-        x -= this.center.x;
-        y -= this.center.y;
-        z -= this.center.z;
-        /* we already know the magnitudo that is just the radius of the sphere
-           so we can easily normalize the vector just dividing for it. */
-        x /= this.radius;
-        y /= this.radius;
-        z /= this.radius;
-        return {x: x, y: y, z: z};
+    /* Normale bzw. "Lot" zu einem Punkt auf der Kugel */
+    normalAtPoint: function(p) {
+        var normal = new Vector(
+            // Vektor vom Zentrum zum Punkt
+            p.x - this.center.x,
+            p.y - this.center.y,
+            p.z - this.center.z,
+        );
+        // Normalisieren mit dem Radius der Kugel
+        normal.multiply(1/this.radius);
+        return normal;
     },
 
-    /* Intersect a ray with this sphere. Returns an object
-       with two fields: 'type' and 'dist'.
+    /* 
+       Untersuche den gegebenen Strahl nach einem Schnitt mit der Kugel.
+       Gibt ein Objekt mit den Feldern 'type' und 'dist' zurück.
 
-       Type can be:
+       Type ist eines von:
+        0: Kein Schnitt
+        1: Internet Schnitt (Strahlenursprung liegt innerhalb der Kugel)
+        2: Externer Schnitt (Strahlenursprung liegt außerhalb der Kugel)
 
-       0: no intersection
-       1: internal intersection (the ray origin is inside the sphere)
-       2: external intersection (the ray origin is outside the sphere)
-
-       The distance is simply the distance between the ray origin and
-       the intersection point.
-
-       NOTE: This function needs ray.direction to be normalized. */
+       Distanz = Strahlenursprung - Schnittpunkt
+    */
     intersect: function(ray) {
         var x, y, z, distance = +Infinity;
 
-        /* set x,y,z to the sphere center minus the ray origin. */
+        /* 
+           Berechne einen Vektor vom Strahlenursprung zum Zentrum der Kugel
+           Nach dem Beispiel von https://en.wikipedia.org/wiki/Line–sphere_intersection
+        */
         x = this.center.x - ray.origin.x;
         y = this.center.y - ray.origin.y;
         z = this.center.z - ray.origin.z;
@@ -197,45 +263,28 @@ Sphere.prototype = {
     }
 }
 
-// Plane
-
+/* Ebenen Objekt */
 function Plane(x1,y1,z1,x2,y2,z2,x3,y3,z3) {
-    /* Create a plane passing from the three points. We take as input
-       the three points but internally represent the plane as the normal
-       to the plane and a point, in the form:
-
-       ax + by + cz + d = 0
-
-       Note: a,b,c is the vector representing the normal. We need to compute
-       a,b,c and d.
-
-       To compute the normal vector a,b,c we use the fact that given three
-       points we can compute v1 and v2, two vectors that are parallel to the
-       plan. */
+    // Bilde eine Ebene aus drei Punkten
+    // Repräsentiere die Ebene durch ihre Normale und eine Verschiebung d an dieser Normalen
+    // Berechne zwei Vektoren, die parallel zur Ebene sind:
     var v1x = x1-x2, v1y = y1-y2, v1z = z1-z2;
     var v2x = x1-x3, v2y = y1-y3, v2z = z1-z3;
 
-    /* Now the vectorial product between v1 and v2 is a vector that
-       is normal to the plane. */
+    /* Berechne die Normale (nx, ny, nz) durch das Kreuprodukt */
     var nx = (v1y*v2z)-(v1z*v2y);
     var ny = (v1z*v2x)-(v1x*v2z);
     var nz = (v1x*v2y)-(v1y*v2x);
 
-    /* We are still missing d, but since we know that x1,y1,z1 is a point
-       on the plane, we know that:
-
-       ax1 + by1 + cz1 + d = 0
-
-       so
-
-       d = -(ax1 + by1 + cz1)
+    /* Es gilt eine Verschiebung entlang der Normalen zu bestimmen.
+       Dafür stellt man ax1 + by1 + cz1 + d = 0 um zu d = -(ax1 + by1 + cz1)
     */
     this.normal = new Vector(nx,ny,nz);
     this.d = -(nx*x1 + ny*y1 + nz*z1);
 }
 
 Plane.prototype = {
-    normalToPoint: function(x,y,z) {
+    normalAtPoint: function(x,y,z) {
         return this.normal;
     },
 
@@ -243,39 +292,30 @@ Plane.prototype = {
         var type = 0;
         var distance = +Infinity;
 
-        /* First check if there is an intersection between the ray and the
-           plane. If the ray is parallel to the plane there is not for sure.
-
-           Compute the dot product between the ray direction and the plan
-           normal (that is, the cosine of the angle between the two vectors).
-           If it is zero we can not have a collision. */
+        /* Prüfe auf einen Schnittpunkt (Wenn der Strahl parallel zur Ebene ist, gibt es keinen) */
         var ndotrd = (this.normal.x * ray.direction.x) +
                      (this.normal.y * ray.direction.y) +
                      (this.normal.z * ray.direction.z);
         if (ndotrd) {
-            /* Compute the intersection distance. */
+            /* Berechne den Abstand des Schnittpunktes */
             var ndoro = (this.normal.x * ray.origin.x) +
                         (this.normal.y * ray.origin.y) +
                         (this.normal.z * ray.origin.z);
             distance = - (ndoro + this.d)/ndotrd;
-            /* Now there is an intersection only if the distance is positive,
-               otherwise the intersection is not in the ray direction
-               (but is backward). */
+            /* Betrachte die Lösung nur, wenn der Schnitt in positiver Strahlenrichtung ist */
             if (distance > 0) type = 1;
         }
         return {type: type, dist: distance};
     }
 }
 
-// Light
-
+// Licht
 function Light() {
     this.type = "light";
     this.center = new Vector();
 }
 
-// Generic scene object implementation
-
+// Generische Objekt Implementierung
 function Obj(name,o) {
     this.name = name;
     this.o = o;
@@ -284,8 +324,59 @@ function Obj(name,o) {
     this.reflection = 0;
 }
 
-// Scene object
+function Color(r, g, b) {
+    if (arguments.length == 1) {
+        g = b = r;
+    }
+    this.r = r;
+    this.g = g;
+    this.b = b;
+}
 
+Color.prototype = {
+
+    add: function(c){
+        this.r += c.r;
+        this.g += c.g;
+        this.b += c.b;
+        return this;
+    },
+
+    multiply: function(factor){
+        if(!(typeof factor === 'object')){
+            this.r *= factor;
+            this.g *= factor;
+            this.b *= factor;
+            return this;
+        }
+        // Wenn es eine Farbe ist
+        this.r *= factor.r;
+        this.g *= factor.g;
+        this.b *= factor.b;
+        return this;
+    },
+
+    add_c: function(c){
+        return this.copy().add(c);
+    },
+
+    multiply_c: function(f){
+        return this.copy().multiply(f);
+    },
+
+    copy: function(){
+        return new Color(this.r, this.g, this.b);
+    },
+
+    cap: function(){
+        this.r = Math.min(Math.max(this.r, 0), 1);
+        this.g = Math.min(Math.max(this.g, 0), 1);
+        this.b = Math.min(Math.max(this.b, 0), 1);
+        return this;
+    },
+}
+
+// Szenen Objekt
 function Scene() {
     this.objects = [];
     this.lights = [];
@@ -304,153 +395,99 @@ Scene.prototype = {
 
     traceRay: function (ray, depth) {
         var obj = null;
-        var color = {r: 0, g: 0, b: 0};
+        var color = new Color(0.2); // Hintergrundfarbe
         var distance = +Infinity;
 
+        //Prüfe nach dem Schnittpunkt mit dem nähsten Objekt
         for (var j = 0; j < this.objects.length; j++) {
             var test_obj = this.objects[j];
             var res = test_obj.o.intersect(ray);
-            if (res.type) {
-                if (obj == null || res.dist < distance) {
-                    obj = test_obj;
-                    distance = res.dist;
-                }
+            if (res.type && (obj == null || res.dist < distance)) {
+                obj = test_obj;
+                distance = res.dist;
             }
         }
 
-        /* Determine the color if we hit sometihng */
-        if (obj) {
-            /* We have the distance, so we can compute the intersection
-               point simply as: origin + (direction * distance) */
-            var x = ray.origin.x + ray.direction.x*distance,
-                y = ray.origin.y + ray.direction.y*distance,
-                z = ray.origin.z + ray.direction.z*distance;
-            /* Now get the normal to the intersection point of the object */
-            var normal = obj.o.normalToPoint(x,y,z);
+        if (!obj) { // Kein Objekt geschnitten.
+            return {obj: obj, color: color}
+        }
 
-            for (var j = 0; j < this.lights.length; j++) {
-                var light = this.lights[j];
+        /* Bestimme die Farbe des Pixels nach einem Schnitt */
+        /* Wir können den Schnittpunkt mit dem Abstand berechnen: origin + (direction * distance) */
+        var intersection = ray.getPoint(distance);
+        /* Und damit den Normalvektor zum Objekt am Punkt erhalten */
+        var normal = obj.o.normalAtPoint(intersection);
 
-                /* COMPUTE RAY INTERSECTION POINT.
-                   Compute the vector that looks from the intersection
-                   point to the light. We do this simply subtracting the
-                   intersection point from the light position. */
-                var lx = light.o.center.x - x;
-                var ly = light.o.center.y - y;
-                var lz = light.o.center.z - z;
-                /* Normalize */
-                var len = Math.sqrt(lx*lx + ly*ly + lz*lz);
-                if (len == 0) len = 1;
-                lx /= len;
-                ly /= len;
-                lz /= len;
+        /* Es wird nun zu jedem Licht ein Strahl ausgesandt, um die Helligkeit zu bestimmen. */
+        for (var j = 0; j < this.lights.length; j++) {
+            var light = this.lights[j];
+            /* Berechne einen normalisierten Vektor vom Schnittpunkt zum aktuellen Licht */
+            var toLight = this.lights[j].o.center.subtract_c(intersection).normalize();
 
-                /* HANDLE SHADOWS.
-                   Is this light obscured by some other object?
-                   We simply trace a ray between the ray-object intersection
-                   point (x,y,z variables) and the light center.
-
-                   If this ray intersects some object with a distance smaller
-                   than the light itself, this point is in shadow from the
-                   point of view of this light. */
-                /* Compute the distance between the point and the light. */
-                var pldistance = Math.sqrt(
-                    (x-light.o.center.x)*(x-light.o.center.x)+
-                    (y-light.o.center.y)*(y-light.o.center.y)+
-                    (z-light.o.center.z)*(z-light.o.center.z));
-                var sray = new Ray();
-                sray.origin.set(x,y,z);
-                /* We need to add a small number towards the light to the
-                   origin vector, to make sure it will not intersect with the
-                   current object itself. */
-                sray.origin.x += lx/10000;
-                sray.origin.y += ly/10000;
-                sray.origin.z += lz/10000;
-                /* To set the direction  we can use lx, ly, lz variables that
-                   are already set to a normalized vector pointing from the
-                   intersection point to the light. */
-                sray.direction.set(lx, ly, lz);
-                var shadow = false;
-                for (var i = 0; i < this.objects.length; i++) {
-                    var test_obj = this.objects[i];
-                    var res = test_obj.o.intersect(sray);
-                    if (res.type && res.dist < pldistance) {
-                        shadow = true;
-                        break;
-                    }
-                }
-                if (shadow) continue; /* try next light */
-
-                /* DIFFUSE SHADING.
-                   Now the dot product between the normal and the point
-                   towards the light is the cosine between the angle
-                   formed by the vectors, that is, our brightness. */
-                var cosine = normal.x*lx+normal.y*ly+normal.z*lz;
-                if (cosine < 0) cosine = 0;
-                color.r += cosine * obj.color.r * light.color.r;
-                color.g += cosine * obj.color.g * light.color.g;
-                color.b += cosine * obj.color.b * light.color.b;
-
-                /* SPECULAR SHADING.
-                   Add point of view dependent specular light using
-                   Phone shading. */
-                if (obj.specularity > 0) {
-                    var vrx = lx - normal.x * cosine * 2,
-                        vry = ly - normal.y * cosine * 2,
-                        vrz = lz - normal.z * cosine * 2;
-                    var cosSigma = (ray.direction.x*vrx)+
-                                   (ray.direction.y*vry)+
-                                   (ray.direction.z*vrz);
-                    if (cosSigma > 0) {
-                        var specularity = obj.specularity;
-                        color.r += light.color.r * specularity * Math.pow(cosSigma,64);
-                        color.g += light.color.g * specularity * Math.pow(cosSigma,64);
-                        color.b += light.color.b * specularity * Math.pow(cosSigma,64);
-                    }
-                }
-
-                /* REFLECTION.
-                   This is easy, we compute the reflection ray, that
-                   is given by:
-
-                   Rr = R - 2* N * (R dot N)
-
-                   Where R is the ray that we want reflected.
-                         N is the normal of the surface.
-
-                   Having the ray we simply call this function recursively
-                   to check the color of the object hit by this reflected
-                   ray. */
-                if (obj.reflection > 0 && depth < 3) {
-                    var rr = new Ray();
-                    var dotnr = (ray.direction.x * normal.x) +
-                                (ray.direction.y * normal.y) +
-                                (ray.direction.z * normal.z);
-                    rr.origin.set(x,y,z);
-                    rr.direction.set(ray.direction.x - 2 * normal.x * dotnr,
-                                     ray.direction.y - 2 * normal.y * dotnr,
-                                     ray.direction.z - 2 * normal.z * dotnr);
-                    rr.origin.x += rr.direction.x / 10000;
-                    rr.origin.y += rr.direction.y / 10000;
-                    rr.origin.z += rr.direction.z / 10000;
-                    var rcolor = this.traceRay(rr,depth+1);
-                    color.r *= 1-obj.reflection;
-                    color.g *= 1-obj.reflection;
-                    color.b *= 1-obj.reflection;
-                    color.r += rcolor.color.r * obj.reflection;
-                    color.g += rcolor.color.g * obj.reflection;
-                    color.b += rcolor.color.b * obj.reflection;
+            /* HANDLE SHADOWS.
+               Wenn der Strahl auf dem Weg vom Schnittpunkt zum Lichtmittelpunkt
+               ein Objekt schneidet, liegt der Punkt im Schatten.*/
+            // Abstand zwischen Schnittpunkt und Licht
+            var intersectionToLightDistance = toLight.magnitude();
+            var sray = new Ray();
+            /* Das ist ein Quick-Fix um einen Schnitt mit dem aktuellen Objekt selbst zu vermeiden*/
+            sray.origin = intersection.add_c(toLight.multiply_c(1/10000));
+            /* Setze die Richtung des Strahls */
+            sray.direction = toLight;
+            var shadow = false;
+            for (var i = 0; i < this.objects.length; i++) {
+                var res = this.objects[i].o.intersect(sray);
+                if (res.type && res.dist < intersectionToLightDistance) {
+                    shadow = true;
+                    break;
                 }
             }
-            if (color.r > 1) color.r = 1;
-            if (color.g > 1) color.g = 1;
-            if (color.b > 1) color.b = 1;
+            if (shadow) continue; /* Liegt im Schatten => Probiere das nächste Licht */
+
+            /* DIFFUSE SHADING.
+               Durch das Kreuzprodukt zwischen der Normale und dem Strahl zum Licht
+               erhalten wir den Cosinus des Winkels zwischen den Vektoren
+               Daraus berechnen wir die Intensität des Lichts und dessen Einfluss.   
+            */
+            var cosine = Math.max(0, normal.dotProduct(toLight));
+            color.add(obj.color.multiply_c(cosine).multiply(light.color));
+
+            /* SPECULAR SHADING.
+               Phong Shading wird verwendet, um einen Glanz-Effekt zu erzeugen.
+               https://de.wikipedia.org/wiki/Phong-Beleuchtungsmodell
+            */
+            if (obj.specularity > 0) {
+                var reflectionDirection = toLight.subtract_c(normal.multiply_c(cosine*2));
+                var cosSigma = ray.direction.dotProduct(reflectionDirection);
+                if (cosSigma > 0) {
+                    color.add(light.color.multiply_c(obj.specularity*Math.pow(cosSigma,64)));
+                }
+            }
+
+            /* REFLECTION.
+               Der Reflektionsstrahl kann berechnet werden mit:
+               Rr = R - 2* N * (R dot N)
+
+               Die Farbe dieser Reflektion wird ermittelt und eingespeist */
+            if (obj.reflection > 0 && depth < reflectionDepth) {
+                var rr = new Ray();
+                var raySurfaceCos = ray.direction.dotProduct(normal);
+                
+                rr.origin = intersection;
+                rr.direction = ray.direction.subtract_c(normal.multiply_c(raySurfaceCos*2));
+                rr.origin.add(rr.direction.multiply_c(1/10000));
+
+                var rcolor = this.traceRay(rr,depth+1);
+                color.multiply(1-obj.reflection);
+                color.add(rcolor.color.multiply_c(obj.reflection));
+            }
         }
+        color.cap();
         return {obj: obj, color: color}
     },
 
     traceScene: function () {
-        var pov = new Vector(0,0,-4);
+        var pov = new Vector(0,0,-fov);
         var ray = new Ray();
 
         ray.origin = pov
@@ -458,7 +495,7 @@ Scene.prototype = {
             for (var y = 0; y < screen_height; y++) {
                 ray.direction.set((x-screen_width/2)/100,
                                   (y-screen_height/2)/100,
-                                  4);
+                                  fov);
                 ray.direction.normalize();
                 var trace = this.traceRay(ray,0);
                 var offset = x*4+y*4*screen_width;
@@ -470,6 +507,57 @@ Scene.prototype = {
             }
         }
     }
+}
+
+
+
+// Variable Functions:
+function updateFov(val){
+    fov = val;
+    document.getElementById('fov').innerHTML = val;
+}
+function updateWidth(val){
+    screen_width = val;
+    document.getElementById('width').innerHTML = val;
+    pixels = ctx.createImageData(screen_width, screen_height);
+}
+function updateHeight(val){
+    screen_height = val;
+    document.getElementById('height').innerHTML = val;
+    pixels = ctx.createImageData(screen_width, screen_height);
+}
+function updateDepth(val){
+    reflectionDepth = val;
+    document.getElementById('reflectionDepth').innerHTML = val;
+}
+
+function startstopClicked(){
+    running = !running;
+
+    text = 'Start';
+    if(running){
+        text = 'Stop';
+    }
+    document.getElementById('runButton').innerHTML = text;
+}
+
+/*
+Manipulate Objects:
+*/
+var sphere1Size = 0.5;
+function updateSphere1Size(val){
+    sphere1Size = val;
+    document.getElementById('s1size').innerHTML = val;
+}
+var sphere2Size = 0.5;
+function updateSphere2Size(val){
+    sphere2Size = val;
+    document.getElementById('s2size').innerHTML = val;
+}
+var sphere2Height = 0;
+function updateSphere2Height(val){
+    sphere2Height = val;
+    document.getElementById('s2height').innerHTML = val;
 }
 
 init();
